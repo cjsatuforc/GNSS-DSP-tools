@@ -9,6 +9,7 @@ import scipy.fftpack as fft
 import gnsstools.gps.ca as ca
 import gnsstools.nco as nco
 import gnsstools.io as io
+import gnsstools.resample as resample
 
 #
 # Acquisition search
@@ -35,7 +36,7 @@ def search(x,prn):
       m_metric = metric
       m_code = ca.code_length*(float(idx)/n)
       m_doppler = doppler
-  return m_metric,m_code,m_doppler
+  return prn,m_metric,m_code,m_doppler
 
 #
 # main program
@@ -45,39 +46,42 @@ filename = sys.argv[1]        # input data, raw file, i/q interleaved, 8 bit sig
 fs = float(sys.argv[2])       # sampling rate, Hz
 coffset = float(sys.argv[3])  # offset to L1 carrier, Hz (positive or negative)
 
-# read first 85 ms of file
+# read first 85 ms of file and resample to fsn
 
 ms = 85
-
 n = int(fs*0.001*ms)
 fp = open(filename,"rb")
-x = io.get_samples_complex(fp,n)
+fsn = 4096000.0
 
-# wipe off nominal offset from channel center to GPS L1 carrier
+if len(sys.argv) > 4:
+  samps = resample.resample(fp,fs,fsn,coffset,type='SE4150L')
+else:
+  samps = resample.resample(fp,fs,fsn,coffset,bw=2200000)
 
-nco.mix(x,-coffset/fs,0)
-
-# resample to 4.096 MHz
-
-fsr = 4096000.0/fs
-h = scipy.signal.firwin(161,1.5e6/(fs/2),window='hanning')
-x = scipy.signal.filtfilt(h,[1],x)
-xr = np.interp((1/fsr)*np.arange(ms*4096),np.arange(len(x)),np.real(x))
-xi = np.interp((1/fsr)*np.arange(ms*4096),np.arange(len(x)),np.imag(x))
-x = xr+(1j)*xi
+x = resample.get_samples_complex(samps,n)
 
 # iterate (in parallel) over PRNs of interest
 
 def worker(p):
   x,prn = p
-  metric,code,doppler = search(x,prn)
-  return 'prn %3d doppler % 7.1f metric % 5.2f code_offset %6.1f' % (prn,doppler,metric,code)
+  return search(x,prn)
 
 import multiprocessing as mp
 
 prns = list(range(1,33))+[133,135,138,140]
+print 'searching for PRNs '+ str(prns)
 cpus = mp.cpu_count()
 results = mp.Pool(cpus).map(worker, map(lambda prn: (x,prn),prns))
 
-for r in results:
-  print(r)
+prn,metric,code,doppler = map(list,zip(*results))
+nfloor = list(metric)
+nfloor.sort()
+nfloor = nfloor[0]
+threshold = 2.0
+#threshold = 2.5
+#threshold = 0
+
+for i in range(len(metric)):
+  met = metric[i]/nfloor
+  if met > threshold:
+    print 'prn %3d doppler % 7.1f metric % 5.2f code_offset %6.1f' % (prn[i],doppler[i],met,code[i])

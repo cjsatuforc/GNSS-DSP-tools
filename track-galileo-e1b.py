@@ -7,6 +7,7 @@ import gnsstools.galileo.e1b as e1b
 import gnsstools.nco as nco
 import gnsstools.io as io
 import gnsstools.discriminator as discriminator
+import gnsstools.resample as resample
 
 class tracking_state:
   def __init__(self,fs,prn,code_p,code_f,code_i,carrier_p,carrier_f,carrier_i,mode):
@@ -23,6 +24,7 @@ class tracking_state:
     self.carrier_e1 = 0
     self.code_e1 = 0
     self.eml = 0
+    print mode
 
 # tracking loops
 
@@ -34,6 +36,7 @@ def track(x,s):
   s.carrier_p = s.carrier_p - n*s.carrier_f/fs
   s.carrier_p = np.mod(s.carrier_p,1)
 
+  # 1540.0 = 1575.42(E1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
   p_early = e1b.correlate(x, s.prn, 0, s.code_p-0.2, cf, e1b.e1b_code(prn), e1b.boc11)
@@ -100,8 +103,22 @@ code_offset = float(sys.argv[6])   # initial code offset from acquisition
 
 fp = open(filename,"rb")
 
+# filter if an additional argument present
+res = True if len(sys.argv) > 7 else False
+if res:
+  #bw = 1700000
+  # SE4150L internal bandwidth
+  #bw = 2200000
+  # E1B "minimum"?
+  bw = 8000000
+  # don't resample, only filter
+  fsn = fs
+  samps = resample.resample(fp,fs,fsn,coffset,bw)
+else:
+  print 'not filtered'
+
 n = int(fs*0.004*((e1b.code_length-code_offset)/e1b.code_length))  # align with 4 ms code boundary
-x = io.get_samples_complex(fp,n)
+x = resample.get_samples_complex(samps,n) if res else io.get_samples_complex(fp,n)
 code_offset += n*250.0*e1b.code_length/fs
 
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
@@ -111,6 +128,8 @@ s = tracking_state(fs=fs, prn=prn,                    # initialize tracking stat
 
 block = 0
 coffset_phase = 0.0
+sync = []
+vote = []
 
 while True:
   if s.code_p<e1b.code_length/2:
@@ -118,21 +137,53 @@ while True:
   else:
     n = int(fs*0.004*(2*e1b.code_length-s.code_p)/e1b.code_length)
 
-  x = io.get_samples_complex(fp,n)
+  x = resample.get_samples_complex(samps,n) if res else io.get_samples_complex(fp,n)
   if x is None:
     break
 
-  nco.mix(x,-coffset/fs,coffset_phase)
-  coffset_phase = coffset_phase - n*coffset/fs
-  coffset_phase = np.mod(coffset_phase,1)
+  if res == False:
+    nco.mix(x,-coffset/fs,coffset_phase)
+    coffset_phase = coffset_phase - n*coffset/fs
+    coffset_phase = np.mod(coffset_phase,1)
 
   for j in range(4):
     a,b = int(j*n/4),int((j+1)*n/4)
+    #print 'j=%d a=%d b=%d n=%d' % (j,a,b,n)
     p_prompt,s = track(x[a:b],s)
-    vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-e1b.chip_rate, (180/np.pi)*np.angle(p_prompt), s.early, s.prompt, s.late
-    print '%d %f %f %f %f %f %f %f %f' % vars
+    #vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-e1b.chip_rate, (180/np.pi)*np.angle(p_prompt), s.eml, s.early, s.prompt, s.late, 'OK' if s.prompt >= s.early and s.prompt >= s.late else ''
+    #print '%3d re=%8.1f im=%8.1f car=%8.1f cf=%6.3f a=%12.3f e=%7.3f %8.1f(E) %8.1f(P) %8.1f(L) %s' % vars
 
+    # try looking for I/NAV sync pattern
+    if j == 0:
+      vsum = np.sum(vote)
+      if vsum == 0 or vsum == 1:
+        bit = 0
+      else:
+        if vsum == 4 or vsum == 3:
+          bit = 1
+        else:
+          bit = 8
+      print '%4d %4d vote %s =%d %s' % (block, block/4, str(vote), bit, '****' if vsum == 2 else ('----' if vsum == 1 or vsum == 3 else ''))
+      vote = []
+      sync.append(bit)
+      if len(sync) > 10:
+        sync.pop(0)
+      vars = block, block/4, str(sync), s.carrier_f, s.code_f-e1b.chip_rate, s.eml, '' if s.prompt >= s.early and s.prompt >= s.late else (s.mode +' UNLOCKED')
+      print '%4d %4d sync %s car=%8.1f cf=%7.3f e=%7.3f %s' % vars
+      if sync == [0,1,0,1,1,0,0,0,0,0]:
+        print 'SYNC %d (%d)' % (block/4,block/4+250)
+      if sync == [1,0,1,0,0,1,1,1,1,1]:
+        print 'SYNC-INV %d (%d)' % (block/4,block/4+250)
+    idat = np.real(p_prompt)
+    ddat = idat
+    #qdat = np.imag(p_prompt)
+    #ddat = idat if abs(idat) > abs(qdat) else qdat
+    vote.append(1 if ddat > 0 else 0)
+    
     block = block + 1
+#    if block/4 == 100:
+#      print 'FLL_NARROW'
+#      s.mode = 'FLL_NARROW'
 #    if (block%100)==0:
 #      sys.stderr.write("%d\n"%block)
 #    if block==500:

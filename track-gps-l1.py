@@ -39,6 +39,7 @@ def track(x,s):
   s.carrier_cyc += dcyc
   s.carrier_p = t
 
+  # 1540.0 = 1575.42(L1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
   p_early = ca.correlate(x, s.prn, 0, s.code_p-0.05, cf, ca.ca_code(prn))
@@ -72,8 +73,11 @@ def track(x,s):
   dll_k1 = 0.00002
   dll_k2 = 0.2
   s.early = np.absolute(p_early)
+  s.early_n = s.early
   s.prompt = np.absolute(p_prompt)
+  s.prompt_n = s.prompt
   s.late = np.absolute(p_late)
+  s.late_n = s.late
   if (s.late+s.early)==0:
     e = 0
   else:
@@ -132,14 +136,17 @@ while True:
     break
   samp += n
 
+  #if coffset != 0:
   nco.mix(x,-coffset/fs,coffset_phase)
   coffset_phase = coffset_phase - n*coffset/fs
   coffset_phase = np.mod(coffset_phase,1)
 
   p_prompt,s = track(x,s)
 
-  vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-ca.chip_rate, (180/np.pi)*np.angle(p_prompt), s.early, s.prompt, s.late, s.code_cyc, s.code_p, s.carrier_cyc, s.carrier_p, samp
-  print '%d %f %f %f %f %f %f %f %f %d %f %d %f %d' % vars
+  #vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-ca.chip_rate, (180/np.pi)*np.angle(p_prompt), s.early, s.prompt, s.late, s.code_cyc, s.code_p, s.carrier_cyc, s.carrier_p, samp, 'OK' if s.prompt >= s.early and s.prompt >= s.late else ''
+  #print '%d %f %f %f %f %f %.0f(E) %.0f(P) %.0f(L) %d %f %d %f %d %s' % vars
+  vars = block, s.carrier_f, s.eml, s.early_n, s.prompt_n, s.late_n, '' if s.prompt_n >= s.early_n and s.prompt_n >= s.late_n else (s.mode +' UNLOCKED')
+  print '%3d car=%6.1f e=%6.3f %7.0f(E) %7.0f(P) %7.0f(L) %s' % vars
 
   block = block + 1
 #  if (block%100)==0:
