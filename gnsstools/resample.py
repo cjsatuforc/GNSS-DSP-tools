@@ -37,7 +37,7 @@ class resample:
 def get_samples_complex(s,n):
   #print 'get_samples_complex n=%d fs=%f fsn=%f co=%f %s' % (n,s.fs,s.fsn,s.coffset,s.type)
   x = io.get_samples_complex(s.fp,n)
-  if x == None:
+  if x.any() == None:
     return None
   
   if s.d == 0:
