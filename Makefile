@@ -33,7 +33,7 @@ tg9f:
 	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 650.1 1
 
 tg30:
-	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 3000.0 369.1
+	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 3000.0 369.1
 
 #prn   2 doppler -1600.0 metric  3.21 code_offset    7.0
 #prn   4 doppler  3000.0 metric  4.28 code_offset  366.9
