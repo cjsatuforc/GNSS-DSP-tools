@@ -25,6 +25,7 @@ class tracking_state:
     self.eml = 0
     self.carrier_cyc = 0
     self.code_cyc = 0
+    print 'loop filter', mode
 
 # tracking loops
 

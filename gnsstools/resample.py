@@ -124,7 +124,7 @@ def get_samples(s,n):
 #      x.real[i] = 1 if x.real[i] >= 0 else -1
 #      x.imag[i] = 1 if x.imag[i] >= 0 else -1
 
-  if s.filter == 'SE4150L':
+  if s.filter == '3rd-order Butterworth':
     x = sig.filtfilt(s.b,s.a,x)
   elif s.filter == 'FIR':
     x = sig.filtfilt(s.h,[1],x)
@@ -133,18 +133,15 @@ def get_samples(s,n):
   if s.filter == 'nofilter' or s.fsn == s.fs:
     return x
   else:
-    ms = int(n/s.fs*1e3)
-    spms_n = int(s.fsn/1e3)
-    
     if s.resample_up_down:
       xr = sig.resample_poly(np.real(x), s.up, s.down)
       xi = sig.resample_poly(np.imag(x), s.up, s.down)
-      print 'resample_poly: ms=%d spms_n=%d Lx=%d Lxr=%d up=%d down=%d' % (ms, spms_n, len(x), len(xr), s.up, s.down)
+      print 'resample_poly: fs=%.0f fsn=%.0f Lx=%d Lxr=%d up=%d down=%d' % (s.fs, s.fsn, len(x), len(xr), s.up, s.down)
     elif s.interp == 1:
       fsr = s.fs/s.fsn
-      xa = fsr*np.arange(ms*spms_n)
+      xa = fsr*np.arange(round(n*s.fsn/s.fs))
       xp = np.arange(len(x))
-      print 'resample_interp: Lxa=%d Lxp=%d Lx=%d' % (len(xa), len(xp), len(x))
+      print 'resample_interp: fs=%.0f fsn=%.0f n=%d Lxa=%d Lxp=%d Lx=%d' % (s.fs, s.fsn, n, len(xa), len(xp), len(x))
       xr = np.interp(xa,xp,np.real(x))
       xi = np.interp(xa,xp,np.imag(x))
     

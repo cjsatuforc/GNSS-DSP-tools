@@ -23,7 +23,10 @@ class tracking_state:
     self.carrier_e1 = 0
     self.code_e1 = 0
     self.eml = 0
-    print mode
+    #self.chip_offset = 0.2
+    self.chip_offset = 0.25
+    #self.chip_offset = 0.5
+    print 'loop filter', mode, 'chip offset', self.chip_offset
 
 # tracking loops
 
@@ -38,9 +41,9 @@ def track(x,s):
   # 1540.0 = 1575.42(E1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
-  p_early = e1b.correlate(x, s.prn, 0, s.code_p-0.2, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_early = e1b.correlate(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
   p_prompt = e1b.correlate(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
-  p_late = e1b.correlate(x, s.prn, 0, s.code_p+0.2, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_late = e1b.correlate(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
 
   if s.mode=='FLL_WIDE':
     fll_k = 2.0
@@ -100,15 +103,13 @@ prn = int(sys.argv[4])             # PRN code
 doppler = float(sys.argv[5])       # initial doppler estimate from acquisition
 code_offset = float(sys.argv[6])   # initial code offset from acquisition
 
-# by default don't resample, only filter
+# by default don't resample
 fsn = fs
 format = 0
 complex = 1
+filter = 'nofilter'
+bw = 8000000
 interp = 0
-#bw = 2200000
-print 'WARNING: 3 MHz filtering used'
-bw = 3000000
-type = 'nofilter'
 
 for i in range(7, len(sys.argv)):
   a = sys.argv[i]
@@ -123,38 +124,47 @@ for i in range(7, len(sys.argv)):
     format = 2
     complex = 0
   elif a == 'SE4150L':
-    type = 'SE4150L'
+    # simulate internal filtering of SE4150L
+    # 3rd order Butterworth, -3dB (0.5) 2.2 MHz, -8dB (0.16) 4 MHz, -23dB (0.005) 8 MHz
     bw = 2200000
+    filter = '3rd-order Butterworth'
+    print 'SE4150L simulation: bw=%.0f' % bw
   elif a == 'FIR':
-    type = 'FIR'
+    filter = 'FIR'
     bw = 4000000
   elif a == 'down':
     fsn = 64000000
-    if type == 'nofilter':
-      type = 'FIR'
+    if filter == 'nofilter':
+      filter = 'FIR'
       bw = 8000000
   elif a == 'up':
     fsn = 69984000
-    if type == 'nofilter':
-      type = 'FIR'
+    if filter == 'nofilter':
+      filter = 'FIR'
       bw = 8000000
   elif a == 'half':
     fsn = fs/2
-    if type == 'nofilter':
-      type = 'FIR'
+    if filter == 'nofilter':
+      filter = 'FIR'
       bw = 8000000
   elif a == 'quarter':
     fsn = fs/4
-    if type == 'nofilter':
-      type = 'FIR'
+    if filter == 'nofilter':
+      filter = 'FIR'
       bw = 8000000
+  elif a == 'interp':
+    interp = 1
   else:
     print 'UNKNOWN arg %s' % a
     sys.exit()
 
 fp = open(filename,"rb")
 
-samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,type)
+if fsn != fs:
+  print 'resampler does not work for streaming yet'
+  sys/exit()
+samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
+fs = fsn
 
 n = int(fs*0.004*((e1b.code_length-code_offset)/e1b.code_length))  # align with 4 ms code boundary
 x = resample.get_samples(samps,n)
@@ -163,7 +173,7 @@ code_offset += n*250.0*e1b.code_length/fs
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
   code_p=code_offset, code_f=e1b.chip_rate, code_i=0,
   carrier_p=0, carrier_f=doppler, carrier_i=0,
-  mode='PLL')
+  mode='FLL_NARROW')
 
 block = 0
 coffset_phase = 0.0
@@ -171,7 +181,7 @@ sync = []
 vote = []
 
 while True:
-  if s.code_p<e1b.code_length/2:
+  if s.code_p < e1b.code_length/2:
     n = int(fs*0.004*(e1b.code_length-s.code_p)/e1b.code_length)
   else:
     n = int(fs*0.004*(2*e1b.code_length-s.code_p)/e1b.code_length)
@@ -197,13 +207,15 @@ while True:
           bit = 1
         else:
           bit = 8
-      print '%4d %4d vote %s =%d %s' % (block, block/4, str(vote), bit, '****' if vsum == 2 else ('----' if vsum == 1 or vsum == 3 else ''))
+      #print '%4d %4d vote %s =%d %s' % (block, block/4, str(vote), bit, '****' if vsum == 2 else ('----' if vsum == 1 or vsum == 3 else ''))
       vote = []
       sync.append(bit)
       if len(sync) > 10:
         sync.pop(0)
-      vars = block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, '' if s.prompt >= s.early and s.prompt >= s.late else (s.mode +' UNLOCKED')
-      print '%4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
+      unlocked = False if s.prompt >= s.early and s.prompt >= s.late else True
+      if unlocked:
+        vars = block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, (s.mode +' UNLOCKED') if unlocked else ''
+        print '%4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
       if sync == [0,1,0,1,1,0,0,0,0,0]:
         print 'SYNC %d (%d) ==========================================================================================================' % (block/4,block/4+250)
       if sync == [1,0,1,0,0,1,1,1,1,1]:

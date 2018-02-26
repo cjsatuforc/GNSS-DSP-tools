@@ -31,7 +31,7 @@ al1t:
 al1f:
 	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 SE4150L
 
-tg9:
+tg9 tl1:
 	./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 650.1
 
 tg30:
@@ -55,7 +55,7 @@ tg30:
 al1x:
 	./acquire-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 cs8 interp
 
-tg21x:
+tg21x tl1x:
 	./track-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 21 2430.0 817.5
 
 # using "rs8"
@@ -74,9 +74,9 @@ tg21x:
 #prn  31 doppler -2000.0 code_offset  534.5 metric  5.69 ****************************
 
 al1x2:
-	./acquire-gps-l1.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 rs8
+	./acquire-gps-l1.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 rs8 SE4150L
 
-ag30x2:
+tl1x2:
 	./track-gps-l1.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 30 -2200.0 857.7 rs8
 
 #prn   5 doppler     0.0 metric  5.29 code_offset 1005.3
@@ -117,13 +117,13 @@ al1x4:
 ae1:
 	./acquire-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000
 
-t30 te1b:
+t30 tb:
 	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1267.0 2.6
 
 tup:
 	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1267.0 2.6 up
 
-t19:
+t19 tb2:
 	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 19 1686.0 2116.9
 
 t12:
@@ -133,21 +133,21 @@ t20:
 	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 20 -500.0 939.2
 
 # NB 2-bit 1,3,-1,-3 data processed as cs8
-#prn   7 doppler  -800.0 code_offset  565.2 metric  2.79 *************
-#prn  12 doppler  2200.0 code_offset 2477.2 metric  3.79 ******************
-#prn  14 doppler  3200.0 code_offset 3770.7 metric  7.03 ***********************************
-#prn  20 doppler  1600.0 code_offset 2884.6 metric  2.77 *************
-#prn  24 doppler   250.0 code_offset 2838.0 metric  7.45 *************************************
-#prn  26 doppler -1000.0 code_offset 1001.0 metric  4.94 ************************
+#prn   7 doppler  -823.0 code_offset  565.2 metric  2.81 **************
+#prn  12 doppler  2178.0 code_offset 2477.2 metric  3.82 *******************
+#prn  14 doppler  3202.0 code_offset 3770.7 metric  7.01 ***********************************
+#prn  20 doppler  1605.0 code_offset 2884.6 metric  2.76 *************
+#prn  24 doppler   265.0 code_offset 2838.0 metric  7.47 *************************************
+#prn  26 doppler -1006.0 code_offset 1001.0 metric  4.92 ************************
 
 ae1x:
 	./acquire-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 cs8 interp
 
-t24x te1w:
-	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 250.0 2838.0 down
+t24x tw:
+	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 265.0 2838.0 SE4150L
 
 t14x:
-	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 14 3200.0 3770.7
+	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 14 3202.0 3770.7
 
 # none! pre-Galileo capture?
 
