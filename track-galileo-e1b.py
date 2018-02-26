@@ -5,7 +5,6 @@ import numpy as np
 
 import gnsstools.galileo.e1b as e1b
 import gnsstools.nco as nco
-import gnsstools.io as io
 import gnsstools.discriminator as discriminator
 import gnsstools.resample as resample
 
@@ -32,7 +31,7 @@ def track(x,s):
   n = len(x)
   fs = s.fs
 
-  nco.mix(x,-s.carrier_f/fs, s.carrier_p)
+  x = nco.mix(x,-s.carrier_f/fs, s.carrier_p)
   s.carrier_p = s.carrier_p - n*s.carrier_f/fs
   s.carrier_p = np.mod(s.carrier_p,1)
 
@@ -101,24 +100,64 @@ prn = int(sys.argv[4])             # PRN code
 doppler = float(sys.argv[5])       # initial doppler estimate from acquisition
 code_offset = float(sys.argv[6])   # initial code offset from acquisition
 
+# by default don't resample, only filter
+fsn = fs
+format = 0
+complex = 1
+interp = 0
+#bw = 2200000
+print 'WARNING: 3 MHz filtering used'
+bw = 3000000
+type = 'nofilter'
+
+for i in range(7, len(sys.argv)):
+  a = sys.argv[i]
+  if a == 'cs8':
+    format = 0
+  elif a == 'cs82':
+    format = 1
+  elif a == 'rs8':
+    format = 0
+    complex = 0
+  elif a == 'rs831':
+    format = 2
+    complex = 0
+  elif a == 'SE4150L':
+    type = 'SE4150L'
+    bw = 2200000
+  elif a == 'FIR':
+    type = 'FIR'
+    bw = 4000000
+  elif a == 'down':
+    fsn = 64000000
+    if type == 'nofilter':
+      type = 'FIR'
+      bw = 8000000
+  elif a == 'up':
+    fsn = 69984000
+    if type == 'nofilter':
+      type = 'FIR'
+      bw = 8000000
+  elif a == 'half':
+    fsn = fs/2
+    if type == 'nofilter':
+      type = 'FIR'
+      bw = 8000000
+  elif a == 'quarter':
+    fsn = fs/4
+    if type == 'nofilter':
+      type = 'FIR'
+      bw = 8000000
+  else:
+    print 'UNKNOWN arg %s' % a
+    sys.exit()
+
 fp = open(filename,"rb")
 
-# filter if an additional argument present
-res = True if len(sys.argv) > 7 else False
-if res:
-  #bw = 1700000
-  # SE4150L internal bandwidth
-  #bw = 2200000
-  # E1B "minimum"?
-  bw = 8000000
-  # don't resample, only filter
-  fsn = fs
-  samps = resample.resample(fp,fs,fsn,coffset,bw)
-else:
-  print 'not filtered'
+samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,type)
 
 n = int(fs*0.004*((e1b.code_length-code_offset)/e1b.code_length))  # align with 4 ms code boundary
-x = resample.get_samples_complex(samps,n) if res else io.get_samples_complex(fp,n)
+x = resample.get_samples(samps,n)
 code_offset += n*250.0*e1b.code_length/fs
 
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
@@ -137,14 +176,9 @@ while True:
   else:
     n = int(fs*0.004*(2*e1b.code_length-s.code_p)/e1b.code_length)
 
-  x = resample.get_samples_complex(samps,n) if res else io.get_samples_complex(fp,n)
+  x = resample.get_samples(samps,n)
   if x is None:
     break
-
-  if res == False:
-    nco.mix(x,-coffset/fs,coffset_phase)
-    coffset_phase = coffset_phase - n*coffset/fs
-    coffset_phase = np.mod(coffset_phase,1)
 
   for j in range(4):
     a,b = int(j*n/4),int((j+1)*n/4)
@@ -168,12 +202,12 @@ while True:
       sync.append(bit)
       if len(sync) > 10:
         sync.pop(0)
-      vars = block, block/4, str(sync), s.carrier_f, s.code_f-e1b.chip_rate, s.eml, '' if s.prompt >= s.early and s.prompt >= s.late else (s.mode +' UNLOCKED')
-      print '%4d %4d sync %s car=%8.1f cf=%7.3f e=%7.3f %s' % vars
+      vars = block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, '' if s.prompt >= s.early and s.prompt >= s.late else (s.mode +' UNLOCKED')
+      print '%4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
       if sync == [0,1,0,1,1,0,0,0,0,0]:
-        print 'SYNC %d (%d)' % (block/4,block/4+250)
+        print 'SYNC %d (%d) ==========================================================================================================' % (block/4,block/4+250)
       if sync == [1,0,1,0,0,1,1,1,1,1]:
-        print 'SYNC-INV %d (%d)' % (block/4,block/4+250)
+        print 'SYNC-INV %d (%d) ======================================================================================================' % (block/4,block/4+250)
     idat = np.real(p_prompt)
     ddat = idat
     #qdat = np.imag(p_prompt)

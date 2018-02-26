@@ -51,6 +51,7 @@ def correlate(x,prn,chips,frac,incr,c,boc11):
   bp6 = (12*(chips+frac))%2
   for i in range(n):
     cboc = 0.953463*boc11[int(bp)] + 0.301511*boc11[int(bp6)]
+    #cboc = boc11[int(bp)]
     p += x[i]*(1.0-2.0*c[int(cp)])*cboc
     cp = (cp+incr)%code_length
     bp = (bp+2*incr)%2

@@ -32,7 +32,7 @@ def track(x,s):
   n = len(x)
   fs = s.fs
 
-  nco.mix(x,-s.carrier_f/fs, s.carrier_p)
+  x = nco.mix(x,-s.carrier_f/fs, s.carrier_p)
   s.carrier_p = s.carrier_p - n*s.carrier_f/fs
   t = np.mod(s.carrier_p,1)
   dcyc = int(round(s.carrier_p-t))
@@ -110,10 +110,29 @@ prn = int(sys.argv[4])             # PRN code
 doppler = float(sys.argv[5])       # initial doppler estimate from acquisition
 code_offset = float(sys.argv[6])   # initial code offset from acquisition
 
+format = 0
+complex = 1
+
+for i in range(7, len(sys.argv)):
+  a = sys.argv[i]
+  if a == 'cs8':
+    format = 0
+  elif a == 'cs82':
+    format = 1
+  elif a == 'rs8':
+    format = 0
+    complex = 0
+  elif a == 'rs831':
+    format = 2
+    complex = 0
+  else:
+    print 'UNKNOWN arg %s' % a
+    sys.exit()
+
 fp = open(filename,"rb")
 
 n = int(fs*0.001*((ca.code_length-code_offset)/ca.code_length))  # align with 1 ms code boundary
-x = io.get_samples_complex(fp,n)
+x = io.get_samples_complex(fp,n) if complex else io.get_samples_real(fp,n)
 code_offset += n*1000.0*ca.code_length/fs
 
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
@@ -131,15 +150,15 @@ while True:
   else:
     n = int(fs*0.001*(2*ca.code_length-s.code_p)/ca.code_length)
 
-  x = io.get_samples_complex(fp,n)
+  x = io.get_samples_complex(fp,n) if complex else io.get_samples_real(fp,n)
   if x is None:
     break
   samp += n
 
-  #if coffset != 0:
-  nco.mix(x,-coffset/fs,coffset_phase)
-  coffset_phase = coffset_phase - n*coffset/fs
-  coffset_phase = np.mod(coffset_phase,1)
+  if coffset != 0:
+    x = nco.mix(x,-coffset/fs,coffset_phase)
+    coffset_phase = coffset_phase - n*coffset/fs
+    coffset_phase = np.mod(coffset_phase,1)
 
   p_prompt,s = track(x,s)
 
@@ -151,7 +170,7 @@ while True:
   block = block + 1
 #  if (block%100)==0:
 #    sys.stderr.write("%d\n"%block)
-  if block==500:
-    s.mode = 'FLL_NARROW'
-  if block==1000:
-    s.mode = 'PLL'
+#  if block==500:
+#    s.mode = 'FLL_NARROW'
+#  if block==1000:
+#    s.mode = 'PLL'

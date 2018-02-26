@@ -3,122 +3,176 @@
 DATA=data/gnss-20170427-L1L2L5.pcap
 DEST_DIR=gnss-20170427-L1L2L5
 
+all: al1x2
 
+####################################################################################################
 # GPS L1
 
-#prn   2 doppler  -800.0 metric  3.96 code_offset   43.2
-#prn   5 doppler  3000.0 metric  5.19 code_offset  414.1
-#prn   6 doppler -3400.0 metric  4.14 code_offset  712.1
-#prn   7 doppler   800.0 metric  6.55 code_offset  987.0
-#prn   9 doppler -2200.0 metric  7.88 code_offset  650.1
-#prn  13 doppler  3400.0 metric  2.68 code_offset  396.4
-#prn  23 doppler -3000.0 metric  2.46 code_offset  808.2
-#prn  26 doppler -2200.0 metric  2.40 code_offset  299.5
-#prn  29 doppler -1200.0 metric  3.89 code_offset  966.3
-#prn  30 doppler  3000.0 metric  7.71 code_offset  369.1
+#prn   2 doppler  -800.0 code_offset   43.2 metric  3.97 *******************
+#prn   5 doppler  3000.0 code_offset  414.1 metric  5.22 **************************
+#prn   6 doppler -3400.0 code_offset  712.1 metric  4.17 ********************
+#prn   7 doppler   800.0 code_offset  987.0 metric  6.58 ********************************
+#prn   9 doppler -2200.0 code_offset  650.1 metric  7.91 ***************************************
+#prn  13 doppler  3400.0 code_offset  396.4 metric  2.70 *************
+#prn  16 doppler  -800.0 code_offset  928.8 metric  1.93 *********
+#prn  23 doppler -3000.0 code_offset  808.2 metric  2.47 ************
+#prn  26 doppler -2200.0 code_offset  299.5 metric  2.41 ************
+#prn  29 doppler -1200.0 code_offset  966.3 metric  3.91 *******************
+#prn  30 doppler  3000.0 code_offset  369.1 metric  7.72 **************************************
 
 al1:
-	python ./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 1
+	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 interp
+#	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 interp search2
+
+# test saturated values, works but slightly less sensitivity
+al1t:
+	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs82
 
 al1f:
-	python ./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000
+	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 SE4150L
 
 tg9:
-	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 650.1
-
-tg9e:
-	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 111
-
-tg9f:
-	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 650.1 1
+	./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2200.0 650.1
 
 tg30:
-	python ./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 3000.0 369.1
+	./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 3000.0 369.1
 
-#prn   2 doppler -1600.0 metric  3.21 code_offset    7.0
-#prn   4 doppler  3000.0 metric  4.28 code_offset  366.9
-#prn   5 doppler -1400.0 metric  5.43 code_offset  969.3
-#prn  18 doppler  4200.0 metric  2.55 code_offset  424.6
-#prn  21 doppler  2400.0 metric  5.80 code_offset  817.5
-#prn  25 doppler -2000.0 metric  2.69 code_offset  969.6
-#prn  26 doppler  3400.0 metric  2.95 code_offset  446.3
-#prn 135 doppler   800.0 metric  2.90 code_offset 1004.5
+# fine search
+#prn   2 doppler -1624.0 code_offset    7.0 metric  3.20 ****************
+#prn   4 doppler  2996.0 code_offset  366.9 metric  4.27 *********************
+#prn   5 doppler -1369.0 code_offset  969.3 metric  5.40 ***************************
+#prn  13 doppler  3317.0 code_offset  160.6 metric  1.89 *********
+#prn  15 doppler  3874.0 code_offset  786.5 metric  1.45 *******
+#prn  18 doppler  4192.0 code_offset  424.6 metric  2.53 ************
+#prn  20 doppler  1874.0 code_offset  166.3 metric  1.49 *******
+#prn  21 doppler  2430.0 code_offset  817.5 metric  5.81 *****************************
+#prn  25 doppler -1922.0 code_offset  969.6 metric  2.71 *************
+#prn  26 doppler  3411.0 code_offset  446.3 metric  2.94 **************
+#prn  29 doppler  1493.0 code_offset  233.3 metric  1.49 *******
+#prn 135 doppler   878.0 code_offset 1004.5 metric  2.92 **************
 
+# NB 2-bit 1,3,-1,-3 data
 al1x:
-	python ./acquire-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s8.dat 69984000 -9334875
+	./acquire-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 cs8 interp
 
 tg21x:
-	python ./track-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s8.dat 69984000 -9334875 21 2400.0 817.5
+	./track-gps-l1.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 21 2430.0 817.5
+
+# using "rs8"
+#prn   1 doppler  1400.0 code_offset  198.3 metric  5.84 *****************************
+#prn   2 doppler -4000.0 code_offset  383.4 metric  1.61 ********
+#prn   5 doppler   800.0 code_offset  878.9 metric  3.52 *****************
+#prn   6 doppler  2800.0 code_offset   18.2 metric  1.36 ******
+#prn  10 doppler -1400.0 code_offset  336.4 metric  1.84 *********
+#prn  13 doppler  1000.0 code_offset  840.7 metric  2.11 **********
+#prn  16 doppler  2200.0 code_offset  318.9 metric  2.86 **************
+#prn  21 doppler  2000.0 code_offset  962.6 metric  4.70 ***********************
+#prn  23 doppler  -600.0 code_offset   50.5 metric  2.46 ************
+#prn  25 doppler -3600.0 code_offset  435.8 metric  4.00 *******************
+#prn  29 doppler -2200.0 code_offset   40.0 metric  6.82 **********************************
+#prn  30 doppler -2200.0 code_offset  857.7 metric  7.47 *************************************
+#prn  31 doppler -2000.0 code_offset  534.5 metric  5.69 ****************************
+
+al1x2:
+	./acquire-gps-l1.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 rs8
+
+ag30x2:
+	./track-gps-l1.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 30 -2200.0 857.7 rs8
 
 #prn   5 doppler     0.0 metric  5.29 code_offset 1005.3
 #prn  30 doppler -1400.0 metric  3.81 code_offset 1008.8
 
-al1x2:
-	python ./acquire-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 
+al1x3:
+	./acquire-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0
 
-tg5x2:
-	python ./track-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 5 0.0 1005.3
+tg5x3:
+	./track-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 5 0.0 1005.3
 
-tg30x2:
-	python ./track-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 30 -1400.0 1008.8
+tg30x3:
+	./track-gps-l1.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 30 -1400.0 1008.8
+
+#prn   5 doppler -4000.0 metric  4.46 code_offset  330.4
+#prn  13 doppler  -400.0 metric  2.54 code_offset  326.2
+#prn  15 doppler  1400.0 metric  2.83 code_offset  174.1
+#prn  20 doppler -1400.0 metric  2.14 code_offset  859.2
+#prn  28 doppler -1000.0 metric  3.44 code_offset  729.8
+#prn  30 doppler -3600.0 metric  3.80 code_offset  525.2
+
+al1x4:
+	./acquire-gps-l1.py ../samples/RTLSDR_Bands-L1.fs.2.048M.iq.s8.dat 2048000 cs8
 
 
+####################################################################################################
 # Galileo E1B
 
-#prn   7 doppler -2450.0 metric  3.21 code_offset 3490.1
-#prn  11 doppler  1100.0 metric  2.69 code_offset 1850.6
-#prn  12 doppler -1400.0 metric  3.75 code_offset 2212.2
-#prn  19 doppler  1700.0 metric  4.67 code_offset 2116.9
-#prn  20 doppler  -500.0 metric  3.63 code_offset  939.2
-#prn  30 doppler -1250.0 metric  5.57 code_offset    2.6
+# fine search
+#prn   7 doppler -2427.0 code_offset 3490.1 metric  3.63 ******************
+#prn  11 doppler  1112.0 code_offset 1850.6 metric  3.03 ***************
+#prn  12 doppler -1385.0 code_offset 2212.2 metric  4.28 *********************
+#prn  18 doppler -4100.0 code_offset 1091.2 metric  3.19 ***************
+#prn  19 doppler  1686.0 code_offset 2116.9 metric  5.24 **************************
+#prn  20 doppler  -515.0 code_offset  939.2 metric  4.13 ********************
+#prn  30 doppler -1267.0 code_offset    2.6 metric  6.26 *******************************
 
 ae1:
-	python ./acquire-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000
+	./acquire-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000
 
-ae1f:
-	python ./acquire-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 1
+t30 te1b:
+	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1267.0 2.6
 
-t12:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 12 -1400.0 2212.2
+tup:
+	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1267.0 2.6 up
 
 t19:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 19 1700.0 2116.9
+	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 19 1686.0 2116.9
+
+t12:
+	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 12 -1400.0 2212.2
 
 t20:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 20 -500.0 939.2
+	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 20 -500.0 939.2
 
-t30:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1250.0 2.6
-
-t30f:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1250.0 2.6 1
-
-t30e:
-	python ./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1250.0 999
-
-#prn   7 doppler  -800.0 metric  2.94 code_offset  565.2
-#prn  12 doppler  2200.0 metric  3.86 code_offset 2477.2
-#prn  14 doppler  3200.0 metric  6.92 code_offset 3770.7
-#prn  20 doppler  1600.0 metric  2.82 code_offset 2884.6
-#prn  24 doppler   250.0 metric  7.81 code_offset 2838.0
-#prn  26 doppler -1000.0 metric  4.97 code_offset 1001.0
+# NB 2-bit 1,3,-1,-3 data processed as cs8
+#prn   7 doppler  -800.0 code_offset  565.2 metric  2.79 *************
+#prn  12 doppler  2200.0 code_offset 2477.2 metric  3.79 ******************
+#prn  14 doppler  3200.0 code_offset 3770.7 metric  7.03 ***********************************
+#prn  20 doppler  1600.0 code_offset 2884.6 metric  2.77 *************
+#prn  24 doppler   250.0 code_offset 2838.0 metric  7.45 *************************************
+#prn  26 doppler -1000.0 code_offset 1001.0 metric  4.94 ************************
 
 ae1x:
-	python ./acquire-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s8.dat 69984000 -9334875
+	./acquire-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 cs8 interp
 
-t3x:
-	python ./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s8.dat 69984000 -9334875 24 250.0 2838.0
+t24x te1w:
+	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 250.0 2838.0 down
 
-#prn   3 doppler   700.0 metric  14.93 code_offset 3072.1
+t14x:
+	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 14 3200.0 3770.7
+
+# none! pre-Galileo capture?
 
 ae1x2:
-	python ./acquire-galileo-e1b.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 
+	./acquire-galileo-e1b.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 rs8
 
-t3x2:
-	python ./track-galileo-e1b.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 3 700.0 3072.1 1
+t2x2:
+	./track-galileo-e1b.py ../samples/primo.fs.5456.if4092.iq.s8.dat 5456000 4092000 2 2222 222.2 rs8
+
+#prn   3 doppler   700.0 code_offset 3072.1 metric  15.00 ***************************************************************************
+
+ae1x3:
+	./acquire-galileo-e1b.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 
+
+t3x3:
+	./track-galileo-e1b.py ../samples/test_14_cut.fs.50M.iq.s8.dat 50000000 0 3 700.0 3072.1
+
+# NB 2-bit 1,3,-1,-3 data
+# nothing found, but unknown what PRNs were being transmitted back then
+
+ae1x4:
+	./acquire-galileo-e1b.py ../samples/gioveAB.fs.16367600.if.4130400.iq.s82.bin 16367600 4130400
 
 
-all: acquire track
+allOFF: acquire track
 
 acquire: ${DATA}
 	mkdir -p ${DEST_DIR}
