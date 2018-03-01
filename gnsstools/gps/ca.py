@@ -145,5 +145,16 @@ def print_first_10_chips():
   for prn in list(g2_delay.keys()):
     print('%d: %04o' % (prn,first_10_chips(prn)))
 
+def print_g2_init():
+  n = code_length
+  x = [1,1,1,1,1,1,1,1,1,1]
+  for i in range(n):
+    r = 0
+    for j in range(0,10):
+      r = 2*r + x[9-j]
+    print 'g2 delay %4d = g2 init %04o' % (1023-i,r)
+    x = g2_shift(x)
+
 if __name__=='__main__':
-  print_first_10_chips()
+  print_g2_init()
+  #print_first_10_chips()
