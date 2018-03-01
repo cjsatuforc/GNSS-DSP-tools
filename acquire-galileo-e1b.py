@@ -92,9 +92,10 @@ for i in range(4, len(sys.argv)):
     format = 0
     complex = 0
     interp = 1
-  elif a == 'rs831':
+  elif a == 'rs81':
     format = 2
     complex = 0
+    interp = 1
   elif a == 'interp':
     interp = 1
   elif a == 'SE4150L':

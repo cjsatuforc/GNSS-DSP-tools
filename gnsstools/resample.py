@@ -73,7 +73,7 @@ class resample:
     elif format == 1:
       print 'format: complex sign-bit only saturated to +127/-127'
     elif format == 2:
-      print 'format: SPECIAL real sign-bit only mode'
+      print 'format: real sign-bit only mode'
 
 def get_samples(s,n):
   #print 'get_samples n=%d fs=%f fsn=%f co=%f %s' % (n,s.fs,s.fsn,s.coffset,s.filter)
@@ -95,8 +95,8 @@ def get_samples(s,n):
       x.imag[i] = sat_max if x.imag[i] >= 0 else sat_min
   elif s.format == 2:
     # force to 1-bit
-    print 'format 2'
-    print 'x.dtype=', x.dtype
+    #print 'format 2'
+    #print 'x.dtype=', x.dtype
     for i in range(len(x)):
       x[i] = 1 if x[i] >= 0 else -1
 

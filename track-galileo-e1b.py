@@ -41,9 +41,9 @@ def track(x,s):
   # 1540.0 = 1575.42(E1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
-  p_early = e1b.correlate(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
-  p_prompt = e1b.correlate(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
-  p_late = e1b.correlate(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_early = e1b.correlate_boc11(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_prompt = e1b.correlate_boc11(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_late = e1b.correlate_boc11(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
 
   if s.mode=='FLL_WIDE':
     fll_k = 2.0
@@ -120,7 +120,7 @@ for i in range(7, len(sys.argv)):
   elif a == 'rs8':
     format = 0
     complex = 0
-  elif a == 'rs831':
+  elif a == 'rs81':
     format = 2
     complex = 0
   elif a == 'SE4150L':
@@ -187,8 +187,6 @@ while True:
     n = int(fs*0.004*(2*e1b.code_length-s.code_p)/e1b.code_length)
 
   x = resample.get_samples(samps,n)
-  if x is None:
-    break
 
   for j in range(4):
     a,b = int(j*n/4),int((j+1)*n/4)
@@ -214,12 +212,12 @@ while True:
         sync.pop(0)
       unlocked = False if s.prompt >= s.early and s.prompt >= s.late else True
       if unlocked:
-        vars = block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, (s.mode +' UNLOCKED') if unlocked else ''
-        print '%4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
+        vars = prn, block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, (s.mode +' UNLOCKED') if unlocked else ''
+        print 'PRN%d %4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
       if sync == [0,1,0,1,1,0,0,0,0,0]:
-        print 'SYNC %d (%d) ==========================================================================================================' % (block/4,block/4+250)
+        print 'PRN%d SYNC %d (%d) ==========================================================================================================' % (prn,block/4,block/4+250)
       if sync == [1,0,1,0,0,1,1,1,1,1]:
-        print 'SYNC-INV %d (%d) ======================================================================================================' % (block/4,block/4+250)
+        print 'PRN%d SYNC-INV %d (%d) ======================================================================================================' % (prn,block/4,block/4+250)
     idat = np.real(p_prompt)
     ddat = idat
     #qdat = np.imag(p_prompt)

@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from .e1b_strings import *
+from e1b_strings import *
 
 chip_rate = 1023000
 code_length = 4092
@@ -43,6 +43,19 @@ except:
     return lambda x: x
 
 @jit(nopython=True)
+def correlate_boc11(x,prn,chips,frac,incr,c,boc11):
+  n = len(x)
+  p = 0.0j
+  cp = (chips+frac)%code_length
+  bp = (2*(chips+frac))%2
+  for i in range(n):
+    cboc = boc11[int(bp)]
+    p += x[i]*(1.0-2.0*c[int(cp)])*cboc
+    cp = (cp+incr)%code_length
+    bp = (bp+2*incr)%2
+  return p
+
+@jit(nopython=True)
 def correlate(x,prn,chips,frac,incr,c,boc11):
   n = len(x)
   p = 0.0j
@@ -50,8 +63,7 @@ def correlate(x,prn,chips,frac,incr,c,boc11):
   bp = (2*(chips+frac))%2
   bp6 = (12*(chips+frac))%2
   for i in range(n):
-    #cboc = 0.953463*boc11[int(bp)] + 0.301511*boc11[int(bp6)]
-    cboc = boc11[int(bp)]
+    cboc = 0.953463*boc11[int(bp)] + 0.301511*boc11[int(bp6)]
     p += x[i]*(1.0-2.0*c[int(cp)])*cboc
     cp = (cp+incr)%code_length
     bp = (bp+2*incr)%2
@@ -61,5 +73,7 @@ def correlate(x,prn,chips,frac,incr,c,boc11):
 # test
 
 if __name__=='__main__':
+  # f5d71
   print(e1b_code(1)[0:20])
+  # 96b85
   print(e1b_code(2)[0:20])

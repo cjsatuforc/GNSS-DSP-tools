@@ -40,13 +40,14 @@ def search_dop(x,prn,sums,min,max,inc):
       m_doppler = doppler
   return prn,m_metric,m_code,m_doppler
 
-def search(x,prn,sums):
+def search(x,prn,sums,fine):
   coarse = 50
   prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,-5000,5000,coarse)
   #print 'prn %d coarse %d' % (prn, m_doppler)
-  window = coarse
-  prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
-  #print 'prn %d fine %d' % (prn, m_doppler)
+  if fine:
+    window = coarse
+    prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
+    #print 'prn %d fine %d' % (prn, m_doppler)
   return prn,m_metric,m_code,m_doppler
 
 def search2(x,prn,fs):
@@ -127,6 +128,8 @@ complex = 1
 filter = 'FIR'
 bw = 3000000
 interp = 0
+all_prns = False
+fine = True
 
 for i in range(4, len(sys.argv)):
   a = sys.argv[i]
@@ -151,9 +154,10 @@ for i in range(4, len(sys.argv)):
     format = 0
     complex = 0
     interp = 1
-  elif a == 'rs831':
+  elif a == 'rs81':
     format = 2
     complex = 0
+    interp = 1
   elif a == 'interp':
     interp = 1
   elif a == 'SE4150L':
@@ -164,6 +168,11 @@ for i in range(4, len(sys.argv)):
     print 'SE4150L simulation: bw=%.0f' % bw
   elif a == 'nofilter':
     filter = 'nofilter'
+  elif a == 'all_prns':
+    all_prns = True
+  elif a == 'coarse':
+    print 'coarse doppler search'
+    fine = False
   else:
     print 'UNKNOWN arg %s' % a
     sys.exit()
@@ -178,6 +187,8 @@ if search_2:
   print 'search 2, fs=%.0f ms=%d n=%d' % (fs, ms, n)
   prns = list(range(1,2))
   #x = io.get_samples_complex(fp,n)
+elif all_prns:
+  prns = ca.g2_delay.keys()
 else:
   print 'search 1, fs=%.0f ms=%d n=%d sums=%d' % (fs, ms, n, sums)
   prns = list(range(1,33))+[133,135,138,140]
@@ -189,7 +200,7 @@ x = resample.get_samples(samps,n)
 
 def worker(p):
   x,prn = p
-  return search2(x,prn,fs) if search_2 else search(x,prn,sums)
+  return search2(x,prn,fs) if search_2 else search(x,prn,sums,fine)
 
 import multiprocessing as mp
 

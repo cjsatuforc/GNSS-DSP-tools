@@ -5,11 +5,11 @@ import numpy as np
 
 import gnsstools.gps.ca as ca
 import gnsstools.nco as nco
-import gnsstools.io as io
 import gnsstools.discriminator as discriminator
+import gnsstools.resample as resample
 
 class tracking_state:
-  def __init__(self,fs,prn,code_p,code_f,code_i,carrier_p,carrier_f,carrier_i,mode):
+  def __init__(self,fs,prn,code_p,code_f,code_i,carrier_p,carrier_f,carrier_i,chip_offset,mode):
     self.fs = fs
     self.prn = prn
     self.code_p = code_p
@@ -18,6 +18,7 @@ class tracking_state:
     self.carrier_p = carrier_p
     self.carrier_f = carrier_f
     self.carrier_i = carrier_i
+    self.chip_offset = chip_offset
     self.mode = mode
     self.prompt1 = 0 + 0*(1j)
     self.carrier_e1 = 0
@@ -25,7 +26,7 @@ class tracking_state:
     self.eml = 0
     self.carrier_cyc = 0
     self.code_cyc = 0
-    print 'loop filter', mode
+    print 'loop filter', mode, 'chip_offset', chip_offset
 
 # tracking loops
 
@@ -43,9 +44,9 @@ def track(x,s):
   # 1540.0 = 1575.42(L1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
-  p_early = ca.correlate(x, s.prn, 0, s.code_p-0.5, cf, ca.ca_code(prn))
+  p_early = ca.correlate(x, s.prn, 0, s.code_p-chip_offset, cf, ca.ca_code(prn))
   p_prompt = ca.correlate(x, s.prn, 0, s.code_p, cf, ca.ca_code(prn))
-  p_late = ca.correlate(x, s.prn, 0, s.code_p+0.5, cf, ca.ca_code(prn))
+  p_late = ca.correlate(x, s.prn, 0, s.code_p+chip_offset, cf, ca.ca_code(prn))
 
   if s.mode=='FLL_WIDE':
     fll_k = 3.0
@@ -111,8 +112,14 @@ prn = int(sys.argv[4])             # PRN code
 doppler = float(sys.argv[5])       # initial doppler estimate from acquisition
 code_offset = float(sys.argv[6])   # initial code offset from acquisition
 
+# by default don't resample
+fsn = fs
 format = 0
 complex = 1
+chip_offset = 0.5
+filter = 'nofilter'
+bw = 2200000
+interp = 0
 
 for i in range(7, len(sys.argv)):
   a = sys.argv[i]
@@ -123,23 +130,32 @@ for i in range(7, len(sys.argv)):
   elif a == 'rs8':
     format = 0
     complex = 0
-  elif a == 'rs831':
+  elif a == 'rs81':
     format = 2
     complex = 0
+  elif a == 'narrow_corr':
+    chip_offset = 0.05
+    print 'narrow_corr chip_offset', chip_offset
   else:
     print 'UNKNOWN arg %s' % a
     sys.exit()
 
 fp = open(filename,"rb")
 
+if fsn != fs:
+  print 'resampler does not work for streaming yet'
+  sys/exit()
+samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
+fs = fsn
+
 n = int(fs*0.001*((ca.code_length-code_offset)/ca.code_length))  # align with 1 ms code boundary
-x = io.get_samples_complex(fp,n) if complex else io.get_samples_real(fp,n)
+x = resample.get_samples(samps,n)
 code_offset += n*1000.0*ca.code_length/fs
 
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
   code_p=code_offset, code_f=ca.chip_rate, code_i=0,
-  carrier_p=0, carrier_f=doppler, carrier_i=0,
-  mode='FLL_WIDE')
+  carrier_p=0, carrier_f=doppler, carrier_i=0, chip_offset=chip_offset,
+  mode='PLL')
 
 block = 0
 coffset_phase = 0.0
@@ -151,26 +167,21 @@ while True:
   else:
     n = int(fs*0.001*(2*ca.code_length-s.code_p)/ca.code_length)
 
-  x = io.get_samples_complex(fp,n) if complex else io.get_samples_real(fp,n)
-  if x is None:
-    break
+  x = resample.get_samples(samps,n)
   samp += n
-
-  if coffset != 0:
-    x = nco.mix(x,-coffset/fs,coffset_phase)
-    coffset_phase = coffset_phase - n*coffset/fs
-    coffset_phase = np.mod(coffset_phase,1)
 
   p_prompt,s = track(x,s)
 
   #vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-ca.chip_rate, (180/np.pi)*np.angle(p_prompt), s.early, s.prompt, s.late, s.code_cyc, s.code_p, s.carrier_cyc, s.carrier_p, samp, 'OK' if s.prompt >= s.early and s.prompt >= s.late else ''
   #print '%d %f %f %f %f %f %.0f(E) %.0f(P) %.0f(L) %d %f %d %f %d %s' % vars
-  vars = block, s.carrier_f, s.eml, s.early_n, s.prompt_n, s.late_n, '' if s.prompt_n >= s.early_n and s.prompt_n >= s.late_n else (s.mode +' UNLOCKED')
-  print '%3d car=%6.1f e=%6.3f %7.0f(E) %7.0f(P) %7.0f(L) %s' % vars
+  unlocked = False if s.prompt_n >= s.early_n and s.prompt_n >= s.late_n else True
+  if unlocked:
+    vars = block, s.carrier_f, s.eml, s.early_n, s.prompt_n, s.late_n, (s.mode +' UNLOCKED') if unlocked else ''
+    print '%3d car=%6.1f e=%6.3f %7.0f(E) %7.0f(P) %7.0f(L) %s' % vars
 
   block = block + 1
-#  if (block%100)==0:
-#    sys.stderr.write("%d\n"%block)
+  if (block%100)==0:
+    sys.stderr.write("PRN%d %d\n" % (prn,block))
 #  if block==500:
 #    s.mode = 'FLL_NARROW'
 #  if block==1000:
