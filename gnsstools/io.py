@@ -25,3 +25,11 @@ def get_samples_real(fp,n):
     sys.exit()
   x = np.fromstring(z,dtype='int8')
   return x
+
+#def put_samples_real(fp,x,n):
+#  z = fp.read(n)
+#  if len(z)!=n:
+#    print 'EOF'
+#    sys.exit()
+#  x = np.fromstring(z,dtype='int8')
+#  return x
