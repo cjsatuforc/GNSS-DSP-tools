@@ -9,7 +9,7 @@ import gnsstools.discriminator as discriminator
 import gnsstools.resample as resample
 
 class tracking_state:
-  def __init__(self,fs,prn,code_p,code_f,code_i,carrier_p,carrier_f,carrier_i,mode):
+  def __init__(self,fs,prn,code_p,code_f,code_i,carrier_p,carrier_f,carrier_i,chip_offset,mode):
     self.fs = fs
     self.prn = prn
     self.code_p = code_p
@@ -18,15 +18,15 @@ class tracking_state:
     self.carrier_p = carrier_p
     self.carrier_f = carrier_f
     self.carrier_i = carrier_i
+    self.chip_offset = chip_offset
     self.mode = mode
     self.prompt1 = 0 + 0*(1j)
     self.carrier_e1 = 0
     self.code_e1 = 0
     self.eml = 0
-    #self.chip_offset = 0.2
-    self.chip_offset = 0.25
-    #self.chip_offset = 0.5
-    print 'loop filter', mode, 'chip offset', self.chip_offset
+    self.sync = []
+    self.ntotal = 0.0
+    print 'loop filter', mode, 'chip_offset', chip_offset
 
 # tracking loops
 
@@ -34,6 +34,7 @@ def track(x,s):
   n = len(x)
   fs = s.fs
 
+  # LO mix (doppler only, carrier has already been removed)
   x = nco.mix(x,-s.carrier_f/fs, s.carrier_p)
   s.carrier_p = s.carrier_p - n*s.carrier_f/fs
   s.carrier_p = np.mod(s.carrier_p,1)
@@ -41,9 +42,13 @@ def track(x,s):
   # 1540.0 = 1575.42(E1) / 1.023(chip rate)
   cf = (s.code_f+s.carrier_f/1540.0)/fs
 
-  p_early = e1b.correlate_boc11(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
-  p_prompt = e1b.correlate_boc11(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
-  p_late = e1b.correlate_boc11(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  # correlate_boc11(x,prn,chips,frac,incr,c,boc11)
+  #p_early = e1b.correlate_boc11(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  #p_prompt = e1b.correlate_boc11(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
+  #p_late = e1b.correlate_boc11(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_early = e1b.correlate_slow_boc11(x, s.prn, 0, s.code_p-s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_prompt = e1b.correlate_slow_boc11(x, s.prn, 0, s.code_p, cf, e1b.e1b_code(prn), e1b.boc11)
+  p_late = e1b.correlate_slow_boc11(x, s.prn, 0, s.code_p+s.chip_offset, cf, e1b.e1b_code(prn), e1b.boc11)
 
   if s.mode=='FLL_WIDE':
     fll_k = 2.0
@@ -88,6 +93,24 @@ def track(x,s):
 
   return p_prompt,s
 
+def locked(s,bit,symbol):
+  s.sync.append(bit)
+  if len(s.sync) > 10:
+    s.sync.pop(0)
+  unlocked = False if s.prompt >= s.early and s.prompt >= s.late else True
+  if unlocked:
+  #if True:
+    vars = prn, symbol, str(s.sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, (s.mode +' UNLOCKED') if unlocked else ''
+    print 'PRN%d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
+  if s.sync == [0,1,0,1,1,0,0,0,0,0]:
+    print 'PRN%d SYNC-N %d (%d) %.0f ===============================================================' % (prn,symbol,symbol+250,s.ntotal)
+    s.ntotal = 0;
+  if s.sync == [1,0,1,0,0,1,1,1,1,1]:
+    print 'PRN%d SYNC-I %d (%d) %.0f ===========================================================' % (prn,symbol,symbol+250,s.ntotal)
+    s.ntotal = 0;
+  return s
+
+
 #
 # main program
 #
@@ -107,9 +130,16 @@ code_offset = float(sys.argv[6])   # initial code offset from acquisition
 fsn = fs
 format = 0
 complex = 1
+# original
+#chip_offset = 0.2
+# works
+chip_offset = 0.25
+# for 1/4 or 1/1 track rate eventually goes unlocked on some samples, but still gets sync!
+#chip_offset = 0.5
 filter = 'nofilter'
 bw = 8000000
 interp = 0
+oversample_4x = True
 
 for i in range(7, len(sys.argv)):
   a = sys.argv[i]
@@ -154,83 +184,91 @@ for i in range(7, len(sys.argv)):
       bw = 8000000
   elif a == 'interp':
     interp = 1
+  elif a == '1x':
+    oversample_4x = False
   else:
     print 'UNKNOWN arg %s' % a
     sys.exit()
+
+print '%s' % ('oversample 4x' if oversample_4x else 'sample 1x')
 
 fp = open(filename,"rb")
 
 if fsn != fs:
   print 'resampler does not work for streaming yet'
   sys/exit()
-samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
+state = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
 fs = fsn
 
 n = int(fs*0.004*((e1b.code_length-code_offset)/e1b.code_length))  # align with 4 ms code boundary
-x = resample.get_samples(samps,n)
+x = resample.get_samples(state,n)
+print 'code alignment n', n
 code_offset += n*250.0*e1b.code_length/fs
 
 s = tracking_state(fs=fs, prn=prn,                    # initialize tracking state
   code_p=code_offset, code_f=e1b.chip_rate, code_i=0,
-  carrier_p=0, carrier_f=doppler, carrier_i=0,
-  mode='FLL_NARROW')
+  carrier_p=0, carrier_f=doppler, carrier_i=0, chip_offset=chip_offset,
+  mode='PLL')
 
-block = 0
+symbol = 0
 coffset_phase = 0.0
-sync = []
 vote = []
+spchip = fs/e1b.chip_rate
+print 'spchip', spchip
 
 while True:
   if s.code_p < e1b.code_length/2:
     n = int(fs*0.004*(e1b.code_length-s.code_p)/e1b.code_length)
   else:
     n = int(fs*0.004*(2*e1b.code_length-s.code_p)/e1b.code_length)
+  #print 'n', n
 
-  x = resample.get_samples(samps,n)
+  x = resample.get_samples(state,n)
+  s.ntotal += float(n)
 
-  for j in range(4):
-    a,b = int(j*n/4),int((j+1)*n/4)
-    #print 'j=%d a=%d b=%d n=%d' % (j,a,b,n)
-    p_prompt,s = track(x[a:b],s)
-    #vars = block, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-e1b.chip_rate, (180/np.pi)*np.angle(p_prompt), s.eml, s.early, s.prompt, s.late, 'OK' if s.prompt >= s.early and s.prompt >= s.late else ''
-    #print '%3d re=%8.1f im=%8.1f car=%8.1f cf=%6.3f a=%12.3f e=%7.3f %8.1f(E) %8.1f(P) %8.1f(L) %s' % vars
-
-    # try looking for I/NAV sync pattern
-    if j == 0:
-      vsum = np.sum(vote)
-      if vsum == 0 or vsum == 1:
-        bit = 0
-      else:
-        if vsum == 4 or vsum == 3:
-          bit = 1
+  if oversample_4x:
+    for j in range(4):
+      a,b = int(j*n/4),int((j+1)*n/4)
+      #print 'j=%d a=%d b=%d n=%d' % (j,a,b,n)
+      p_prompt,s = track(x[a:b],s)
+      #vars = symbol, np.real(p_prompt), np.imag(p_prompt), s.carrier_f, s.code_f-e1b.chip_rate, (180/np.pi)*np.angle(p_prompt), s.eml, s.early, s.prompt, s.late, 'OK' if s.prompt >= s.early and s.prompt >= s.late else ''
+      #print '%3d re=%8.1f im=%8.1f car=%8.1f cf=%6.3f a=%12.3f e=%7.3f %8.1f(E) %8.1f(P) %8.1f(L) %s' % vars
+  
+      # try looking for I/NAV sync pattern
+      if j == 0:
+        vsum = np.sum(vote)
+        if vsum == 0 or vsum == 1:
+          bit = 0
         else:
-          bit = 8
-      #print '%4d %4d vote %s =%d %s' % (block, block/4, str(vote), bit, '****' if vsum == 2 else ('----' if vsum == 1 or vsum == 3 else ''))
-      vote = []
-      sync.append(bit)
-      if len(sync) > 10:
-        sync.pop(0)
-      unlocked = False if s.prompt >= s.early and s.prompt >= s.late else True
-      if unlocked:
-        vars = prn, block, block/4, str(sync), s.carrier_f, s.carrier_f-doppler, s.code_f-e1b.chip_rate, s.eml, (s.mode +' UNLOCKED') if unlocked else ''
-        print 'PRN%d %4d %4d sync %s car=%8.1f(%+5.1f) cf=%7.3f e=%7.3f %s' % vars
-      if sync == [0,1,0,1,1,0,0,0,0,0]:
-        print 'PRN%d SYNC %d (%d) ==========================================================================================================' % (prn,block/4,block/4+250)
-      if sync == [1,0,1,0,0,1,1,1,1,1]:
-        print 'PRN%d SYNC-INV %d (%d) ======================================================================================================' % (prn,block/4,block/4+250)
-    idat = np.real(p_prompt)
-    ddat = idat
-    #qdat = np.imag(p_prompt)
-    #ddat = idat if abs(idat) > abs(qdat) else qdat
-    vote.append(1 if ddat > 0 else 0)
+          if vsum == 4 or vsum == 3:
+            bit = 1
+          else:
+            bit = 8
+        #if vsum != 0 and vsum != 4:
+        #  print '%4d %4d vote %s =%d %s' % (symbol, symbol/4, str(vote), bit, '****' if vsum == 2 else ('----' if vsum == 1 or vsum == 3 else ''))
+        vote = []
+        s = locked(s,bit,symbol/4)
+      #} j0
+      
+      vote.append(1 if np.real(p_prompt) > 0 else 0)
     
-    block = block + 1
-#    if block/4 == 100:
+      symbol = symbol + 1
+    #} j0..3
+
+  else:
+    p_prompt,s = track(x,s)
+    bit = 1 if np.real(p_prompt) > 0 else 0
+    s = locked(s,bit,symbol)
+    symbol = symbol + 1
+
+#} while T
+
+#    if symbol/4 == 100:
 #      print 'FLL_NARROW'
 #      s.mode = 'FLL_NARROW'
-#    if (block%100)==0:
-#      sys.stderr.write("%d\n"%block)
-#    if block==500:
+#    if (symbol%100)==0:
+#      sys.stderr.write("%d\n"%symbol)
+#    if symbol==500:
 #      s.mode = 'FLL_NARROW'
-#    if block==1000:
+#    if symbol==1000:
 #      s.mode = 'PLL'
