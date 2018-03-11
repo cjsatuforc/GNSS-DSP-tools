@@ -10,13 +10,16 @@ import gnsstools.galileo.e1b as e1b
 import gnsstools.nco as nco
 import gnsstools.resample as resample
 
+# internal resampling rate to make FFTs pow2
+fsn = 8192000.0
+
 #
 # Acquisition search
 #
 
 def search_dop(x,prn,sums,min,max,inc):
-  fs = 8192000.0
-  n = 32768                                        # 4 ms coherent integration
+  fs = fsn
+  n = int(fsn*e1b.code_period)                      # 4 ms coherent integration
   incr = float(e1b.code_length)/n
   c = e1b.code(prn,0,0,incr,n)                     # obtain samples of the E1-B code
   boc = nco.boc11(0,0,incr,n)
@@ -34,19 +37,21 @@ def search_dop(x,prn,sums,min,max,inc):
     idx = np.argmax(q)
     if q[idx] > m_metric:
       m_metric = q[idx]
+      m_shift = idx
       m_code = e1b.code_length*(float(idx)/n)
       m_doppler = doppler
+  m_shift = m_shift%n
   m_code = m_code%e1b.code_length
-  return prn,m_metric,m_code,m_doppler
+  return prn,m_metric,m_shift,m_code,m_doppler
 
 def search(x,prn,sums):
   coarse = 50
-  prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,-4000,4000,coarse)
+  prn,m_metric,m_shift,m_code,m_doppler = search_dop(x,prn,sums,-4000,4000,coarse)
   #print 'prn %d coarse %d' % (prn, m_doppler)
   window = coarse
-  prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
+  prn,m_metric,m_shift,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
   #print 'prn %d fine %d' % (prn, m_doppler)
-  return prn,m_metric,m_code,m_doppler
+  return prn,m_metric,m_shift,m_code,m_doppler
 
 #
 # main program
@@ -112,12 +117,15 @@ for i in range(4, len(sys.argv)):
 
 # read first ms of file and resample to fsn
 
-n = int(fs*0.001*ms)
+#n = int(fs*0.001*ms)   # needed only 1ms originally?
+n = int(fs*e1b.code_period*ms)
 fp = open(filename,"rb")
-fsn = 8192000.0
 
 samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
 x = resample.get_samples(samps,n)
+
+print 'shift is modulo fsn %d samples over code period %dms' % (fsn*e1b.code_period,int(e1b.code_period*1000))
+print 'code_offset is modulo code length %d' % (e1b.code_length)
 
 # iterate (in parallel) over PRNs of interest
 
@@ -127,17 +135,17 @@ def worker(p):
 
 import multiprocessing as mp
 
-prns = list(range(1,51))
+#prns = list(range(1,51))
 # if using a limited prn list:
 #   don't forget to include a prn that won't be found to establish the noise floor
 #   or set threshold = 0
-#prns = [1,19,30]
+prns = [1,11,12]
 print 'searching for PRNs '+ str(prns)
 cpus = mp.cpu_count()
 results = mp.Pool(cpus).map(worker, map(lambda prn: (x,prn),prns))
 
-prn,metric,code,doppler = map(list,zip(*results))
-#prn,metric,code,doppler = search(x,1,sums)
+prn,metric,shift,code,doppler = map(list,zip(*results))
+#prn,metric,shift,code,doppler = search(x,1,sums)
 
 nfloor = list(metric)
 nfloor.sort()
@@ -154,4 +162,4 @@ for i in range(len(metric)):
     g = ''
     for j in range(int(met*5)):
       g = g +'*'
-    print 'prn %3d doppler % 7.1f code_offset %6.1f metric % 5.2f %s' % (prn[i],doppler[i],code[i],met,g)
+    print 'prn %3d doppler % 7.1f shift %6d code_offset %6.1f metric % 5.2f %s' % (prn[i],doppler[i],shift[i],code[i],met,g)

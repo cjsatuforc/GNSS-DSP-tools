@@ -8,6 +8,7 @@ all: al1x2
 conv:
 	./convert-iq-real.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat HackRF_Bands-L1.fs.10M.if.420k.rs8.dat 10000000 420000
 
+# REMINDER: packed files (i.e. rs81p) not supported yet. Use rs81 which truncates to 1-bit, sign-only.
 
 ####################################################################################################
 # GPS L1
@@ -23,13 +24,18 @@ conv:
 #prn 135 doppler  -204.0 code_offset  487.5 metric  1.48 *******
 #prn 138 doppler  -310.0 code_offset  407.1 metric  3.41 *****************
 
-al1x0:
-	./acquire-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 rs81 all_prns coarse
+al1:
+#	./acquire-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 rs81
+#	./acquire-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 rs81 all_prns
+	./acquire-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 rs81 coarse
 
-tl1x0:
-#	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 9 -1636 649.9 rs81
+tl1:
+	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 9 -1636 649.9 rs81
 #	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 17 1084 942.1 rs81
-	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 133 -311 647.9 rs81
+#	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 133 -311 647.9 rs81
+
+tl1rs8:
+	./track-gps-l1.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 9 -1636 649.9 rs8
 
 #prn   2 doppler  -855.0 code_offset   43.2 metric  3.94 *******************
 #prn   5 doppler  2931.0 code_offset  414.1 metric  5.19 *************************
@@ -43,18 +49,18 @@ tl1x0:
 #prn  29 doppler -1130.0 code_offset  966.3 metric  3.89 *******************
 #prn  30 doppler  2905.0 code_offset  369.1 metric  7.75 **************************************
 
-al1:
+al1x0:
 	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 interp
 #	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 interp search2
 
 # test saturated values, works but slightly less sensitivity
-al1t:
+al1x0t:
 	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs82
 
-al1f:
+al1x0f:
 	./acquire-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 cs8 SE4150L
 
-tg9 tl1:
+tg9:
 	./track-gps-l1.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 9 -2214.0 650.1
 
 tg30:
@@ -130,12 +136,16 @@ al1x4:
 #prn  11 doppler  1299.0 code_offset 2419.0 metric  8.67 *******************************************
 #prn  12 doppler  -685.0 code_offset 2955.9 metric  8.98 ********************************************
 
-ae1x0:
+ae1:
 	./acquire-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 rs81
 
-te1x0:
-#	./track-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 12 -685 2955.9 rs81
-	./track-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 11 1299 2419.0 rs81
+# remember: rs81 forces rs8 (possibly 2-bit, [1,3,-1,-3]) data to 1-bit sign only
+te1:
+#	./track-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 12 -685 2955.9 rs81 1x
+	./track-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 11 1299 2419.0 rs81 1x
+
+te1rs8:
+	./track-galileo-e1b.py ../samples/SiGe_Bands-L1.fs.16368.if.4092.rs81.dat 16368000 4092000 12 -685 2955.9 rs8
 
 #prn   7 doppler -2427.0 code_offset 3490.1 metric  3.63 ******************
 #prn  11 doppler  1112.0 code_offset 1850.6 metric  3.03 ***************
@@ -145,10 +155,10 @@ te1x0:
 #prn  20 doppler  -515.0 code_offset  939.2 metric  4.13 ********************
 #prn  30 doppler -1267.0 code_offset    2.6 metric  6.26 *******************************
 
-ae1:
+ae1x0:
 	./acquire-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000
 
-t30 tb:
+t30 te1x0:
 	./track-galileo-e1b.py ../samples/HackRF_Bands-L1.fs.10M.if.420k.iq.s8.dat 10000000 420000 30 -1267.0 2.6
 
 tup:
@@ -175,7 +185,8 @@ ae1x:
 	./acquire-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 cs8 interp
 
 t24x tw:
-	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 265.0 2838.0 SE4150L
+	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 265.0 2838.0 1x
+#	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 24 265.0 2838.0 SE4150L
 
 t14x:
 	./track-galileo-e1b.py ../samples/gnss-20170427-L1.fs.69.984M.if.-9.334875M.iq.s82.dat 69984000 -9334875 14 3202.0 3770.7

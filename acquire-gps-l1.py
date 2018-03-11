@@ -10,13 +10,16 @@ import gnsstools.gps.ca as ca
 import gnsstools.nco as nco
 import gnsstools.resample as resample
 
+# internal resampling rate to make FFTs pow2
+fsn = 4096000.0
+
 #
 # Acquisition search
 #
 
 def search_dop(x,prn,sums,min,max,inc):
-  fs = 4096000.0
-  n = 4096                                         # 1 ms coherent integration
+  fs = fsn
+  n = int(fsn*ca.code_period)                      # 1 ms coherent integration
   incr = float(ca.code_length)/n
   c = ca.code(prn,0,0,incr,n)                      # obtain samples of the C/A code
   c = fft.fft(c)
@@ -36,81 +39,20 @@ def search_dop(x,prn,sums,min,max,inc):
     metric = q[idx]/np.mean(q)
     if metric > m_metric:
       m_metric = metric
+      m_shift = idx
       m_code = ca.code_length*(float(idx)/n)
       m_doppler = doppler
-  return prn,m_metric,m_code,m_doppler
+  return prn,m_metric,m_shift,m_code,m_doppler
 
 def search(x,prn,sums,fine):
   coarse = 50
-  prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,-5000,5000,coarse)
+  prn,m_metric,m_shift,m_code,m_doppler = search_dop(x,prn,sums,-5000,5000,coarse)
   #print 'prn %d coarse %d' % (prn, m_doppler)
   if fine:
     window = coarse
-    prn,m_metric,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
+    prn,m_metric,m_shift,m_code,m_doppler = search_dop(x,prn,sums,m_doppler-window,m_doppler+window,1)
     #print 'prn %d fine %d' % (prn, m_doppler)
-  return prn,m_metric,m_code,m_doppler
-
-def search2(x,prn,fs):
-  n = len(x)
-  ca_freq = 1023000.0
-  ca_phase = 0
-  ca_rate = ca_freq/fs
-  cc = ca.ca_code(prn)
-  r = 0
-  for i in range(0,10):
-    r = 2*r + cc[i]
-  print 'prn=%d len(cc)=%d f10c=0%04o' % (prn, len(cc), r)
-  ci = 0
-  c = np.zeros(n,dtype='c8')
-  scp = []
-  sci = []
-
-  for i in range(n):
-    c.real[i] = 1 if cc[ci] == 0 else -1
-    c.imag[i] = 0
-    scp.append(ca_phase)
-    sci.append(ci)
-    ca_phase += ca_rate
-    if ca_phase >= 1.0:
-      ca_phase -= 1.0
-      ci = ci+1
-      if ci == 1023:
-        ci = 0
-  cf = fft.fft(c)
-  for i in range(32):
-    print 'prn=%d i=%d cp=%.3f ci=%d chip %d fft=%.1f/%.1f' % (prn,i,scp[i],sci[i],c.real[i],cf.real[i],cf.imag[i])
-
-  max_snr,max_snr_i,max_snr_dop = 0,0,0
-  p = np.zeros(n,dtype='c8')
-  for dop in range(-5000,5000,200):        # doppler bins
-    for i in range(n):
-      j = (i+dop+n)%n
-      p.real[i] = x.real[i]*cf.real[j] + x.imag[i]*cf.imag[j]
-      p.imag[i] = x.real[i]*cf.imag[j] - x.imag[i]*cf.real[j]
-    if dop == -5000:
-      for i in range(32):
-        print 'prn=%d i=%d prod=%.1f/%.1f' % (prn,i,p.real[i],p.imag[i])
-    p = fft.ifft(p)
-
-    max_pwr = 0.0
-    tot_pwr = 0.0
-    max_pwr_i = 0
-    for i in range(int(fs/1000)):
-      pwr = p.real[i]*p.real[i] + p.imag[i]*p.imag[i]
-      if pwr > max_pwr:
-        max_pwr = pwr
-        max_pwr_i = i
-      tot_pwr += pwr
-
-    ave_pwr = tot_pwr/i
-    snr = max_pwr/ave_pwr
-    if snr > max_snr:
-      max_snr = snr
-      max_snr_dop = dop
-      max_snr_i = max_pwr_i
-
-  m_code = (max_snr_i*1023.0)/(fs/1000)
-  return prn,max_snr,m_code,max_snr_dop
+  return prn,m_metric,m_shift,m_code,m_doppler
 
 #
 # main program
@@ -122,7 +64,6 @@ coffset = float(sys.argv[3])  # offset to L1 carrier, Hz (positive or negative)
 
 sums = 80
 ms = sums+5
-search_2 = False
 format = 0
 complex = 1
 filter = 'FIR'
@@ -136,10 +77,6 @@ for i in range(4, len(sys.argv)):
   if a == 'sum1':
     sums = 1
     ms = 1
-  elif a == 'search2':
-    search_2 = True
-    ms = 8
-    filter = 'nofilter'
   elif a == 'sum8':
     sums = 8
     ms = sums+5
@@ -179,28 +116,27 @@ for i in range(4, len(sys.argv)):
 
 # read first ms of file and resample to fsn
 
-n = int(fs*0.001*ms)
+n = int(fs*ca.code_period*ms)
 fp = open(filename,"rb")
-fsn = 4096000.0
 
-if search_2:
-  print 'search 2, fs=%.0f ms=%d n=%d' % (fs, ms, n)
-  prns = list(range(1,2))
-  #x = io.get_samples_complex(fp,n)
-elif all_prns:
+if all_prns:
   prns = ca.g2_delay.keys()
 else:
-  print 'search 1, fs=%.0f ms=%d n=%d sums=%d' % (fs, ms, n, sums)
-  prns = list(range(1,33))+[133,135,138,140]
+  print 'search, fs=%.0f ms=%d n=%d sums=%d' % (fs, ms, n, sums)
+  #prns = list(range(1,33))+[133,135,138,140]
+  prns = list(range(1,33))
 
 samps = resample.resample(fp,fs,fsn,coffset,format,complex,interp,bw,filter)
 x = resample.get_samples(samps,n)
+
+print 'shift is modulo fsn %d samples over code period %dms' % (fsn*ca.code_period,int(ca.code_period*1000))
+print 'code_offset is modulo code length %d' % (ca.code_length)
 
 # iterate (in parallel) over PRNs of interest
 
 def worker(p):
   x,prn = p
-  return search2(x,prn,fs) if search_2 else search(x,prn,sums,fine)
+  return search(x,prn,sums,fine)
 
 import multiprocessing as mp
 
@@ -212,7 +148,7 @@ print 'searching for PRNs '+ str(prns)
 cpus = mp.cpu_count()
 results = mp.Pool(cpus).map(worker, map(lambda prn: (x,prn),prns))
 
-prn,metric,code,doppler = map(list,zip(*results))
+prn,metric,shift,code,doppler = map(list,zip(*results))
 nfloor = list(metric)
 nfloor.sort()
 nfloor = nfloor[0]
@@ -227,4 +163,4 @@ for i in range(len(metric)):
     g = ''
     for j in range(int(met*5)):
       g = g +'*'
-    print 'prn %3d doppler % 7.1f code_offset %6.1f metric % 5.2f %s' % (prn[i],doppler[i],code[i],met,g)
+    print 'prn %3d doppler % 7.1f shift %6d code_offset %6.1f metric % 5.2f %s' % (prn[i],doppler[i],shift[i],code[i],met,g)

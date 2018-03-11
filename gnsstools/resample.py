@@ -69,9 +69,9 @@ class resample:
       self.down = found_down
     
     if format == 0:
-      print 'format: complex signed 8-bit'
+      print 'format: %s signed 8-bit' % ('complex' if complex else 'real')
     elif format == 1:
-      print 'format: complex sign-bit only saturated to +127/-127'
+      print 'format: %s sign-bit only saturated to +127/-127' % ('complex' if complex else 'real')
     elif format == 2:
       print 'format: real sign-bit only mode'
 
@@ -94,11 +94,11 @@ def get_samples(s,n):
       x.real[i] = sat_max if x.real[i] >= 0 else sat_min
       x.imag[i] = sat_max if x.imag[i] >= 0 else sat_min
   elif s.format == 2:
-    # force to 1-bit
-    #print 'format 2'
+    # clip real values to 1-bit
+    #print 'format 2', len(x)
     #print 'x.dtype=', x.dtype
-    for i in range(len(x)):
-      x[i] = 1 if x[i] >= 0 else -1
+    # x = 1 if x >= 0 else -1
+    x = ((np.clip(x,-1,0) + 1) * 2) - 1;
 
 #  if s.d == 0:
 #    print 'I %d|%d %d|%d %d|%d %d|%d' % (xc.real[0],x.real[0],xc.real[1],x.real[1],xc.real[2],x.real[2],xc.real[3],x.real[3])
@@ -118,11 +118,12 @@ def get_samples(s,n):
     s.coffset_phase = s.coffset_phase - n*s.coffset/s.fs
     s.coffset_phase = np.mod(s.coffset_phase,1)
   
+  # clip complex values to 1-bit (not really needed if coffset mixer is perfect)
+  # BUT if this is enabled the doppler values of acquire-gps-l1.py are off!
 #  if s.format == 2:
-#    # force to 1-bit
-#    for i in range(len(x)):
-#      x.real[i] = 1 if x.real[i] >= 0 else -1
-#      x.imag[i] = 1 if x.imag[i] >= 0 else -1
+#    x = ((np.clip(x,-1-1j,0+0j) + (1+1j)) * 2) - (1+1j)
+#  for i in range(0,32):
+#    print '%2d x %s %s' % (i, x.real[i], x.imag[i])
 
   if s.filter == '3rd-order Butterworth':
     x = sig.filtfilt(s.b,s.a,x)

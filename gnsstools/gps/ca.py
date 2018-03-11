@@ -6,6 +6,7 @@ import numpy as np
 
 chip_rate = 1023000
 code_length = 1023
+code_period = float(code_length) / chip_rate
 
 # G2 delay table from pages 6--8 and pages 57--61 of IS-GPS-200H
 # index is PRN, value is G2 delay
@@ -109,6 +110,7 @@ def code(prn,chips,frac,incr,n):
   idx = np.floor(idx).astype('int')
   idx = np.mod(idx,code_length)
   x = c[idx]
+  #print 'ca.code() len:x %d len:idx %d len:c %d frac %.3f incr %.3f' % (len(x),len(idx),len(c),frac,incr)
   return 1.0 - 2.0*x
 
 try:
